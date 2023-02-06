@@ -1,35 +1,31 @@
-import selectors
+import asyncio
 import socket
-from selectors import SelectorKey
-from typing import List, Tuple
+from asyncio import AbstractEventLoop
 
-selector = selectors.DefaultSelector()
 
-server_socket = socket.socket()
-server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+async def echo(connection: socket, loop: AbstractEventLoop) -> None:
+    while data := await loop.sock_recv(connection, 1024):
+        # await loop.sock_sendall(connection, data)
+        await loop.sock_sendall(connection, data)
 
-server_address = ('127.0.0.1', 8000)
-server_socket.setblocking(False)
-server_socket.bind(server_address)
-server_socket.listen()
 
-selector.register(server_socket, selectors.EVENT_READ)
+async def listen_for_connection(server_socket: socket, loop: AbstractEventLoop):
+    while True:
+        connection, address = await loop.sock_accept(server_socket)
+        connection.setblocking(False)
+        print(f"Получен запрос на подключение от {address}")
+        asyncio.create_task(echo(connection, loop))
 
-while True:
-    events: List[Tuple[SelectorKey, int]] = selector.select(timeout=1)
 
-    if len(events) == 0:
-        print('Событий нет, подожду еще!')
+async def main():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    for event, _ in events:
-        event_socket = event.fileobj
+    server_address = ('127.0.0.1', 8000)
+    server_socket.setblocking(False)
+    server_socket.bind(server_address)
+    server_socket.listen()
 
-        if event_socket == server_socket:
-            connection, address = server_socket.accept()
-            connection.setblocking(False)
-            print(f"Получен запрос на подключение от {address}")
-            selector.register(connection, selectors.EVENT_READ)
-        else:
-            data = event_socket.recv(1024)
-            print(f"Получены данные: {data}")
-            event_socket.send(data)
+    await listen_for_connection(server_socket, asyncio.get_event_loop())
+
+asyncio.run(main())
