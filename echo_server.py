@@ -1,12 +1,18 @@
 import asyncio
 import socket
+import logging
 from asyncio import AbstractEventLoop
 
 
 async def echo(connection: socket, loop: AbstractEventLoop) -> None:
-    while data := await loop.sock_recv(connection, 1024):
-        # await loop.sock_sendall(connection, data)
-        await loop.sock_sendall(connection, data)
+    try:
+        while data := await loop.sock_recv(connection, 1024):
+            print('получены данные!')
+            await loop.sock_sendall(connection, data)
+    except Exception as ex:
+        logging.exception(ex)
+    finally:
+        connection.close()
 
 
 async def listen_for_connection(server_socket: socket, loop: AbstractEventLoop):
@@ -27,5 +33,6 @@ async def main():
     server_socket.listen()
 
     await listen_for_connection(server_socket, asyncio.get_event_loop())
+
 
 asyncio.run(main())
